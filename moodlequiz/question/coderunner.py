@@ -138,7 +138,7 @@ class CodeRunner(GradedQuestion):
         self.testcase.append(T)
 
     def __extractfunction(self,f):
-        '''Extracts the text of a callable function or returns a string unaltered.'''
+        '''Internal function that extracts the text of a callable function or returns a string unaltered.'''
         calledby = inspect.stack()[1][3]
         if isinstance(f,str):
             return f
@@ -150,20 +150,11 @@ class CodeRunner(GradedQuestion):
         else:
             raise Exception("Expected a string or callable")
 
-
-    # @property
-    # def _answerpreload_(self):
-    #     return "\n".join(self._answerpreload_list)
-
     def answerpreload(self,f):
         '''Can be used as either a method that takes a function as an argument or as a decorator.'''
         f = self.__extractfunction(f)
         self._answerpreload_list.append(f)
         return f
-
-    # @property
-    # def _answer_(self):
-    #     return "\n".join(self._answer_list)
 
     def answer(self,f):
         '''Can be used as either a method that takes a function as an argument or as a decorator.'''
@@ -171,56 +162,68 @@ class CodeRunner(GradedQuestion):
         self._answer_list.append(f)
         return f
 
+    def template(self,f):
+        '''Can be used as either a method that takes a function as an argument or used as a decorator'''
+        f = self.__extractfunction(f)
+        self._template_list.append(f)
+        return f
 
-    # @property
-    # def _template_(self):
-    #     return "\n".join(self._template_list)
+    class __ContextManagerStore:
+        '''Internal class used for constructing Context Managers that store to the parent class'''
 
-    # def template(self,f):
-    # 	'''Can be used as either a method that takes a function as an argument or used as a decorator'''
-    # 	f = self.__extractfunction(f)
-    # 	self._template_list.append(f)
-    # 	return f
+        def __init__(self,parent,store_to):
+            self.parent = parent
+            self.store_to = store_to
 
-    @property
-    def template(self):
-        '''Returns a context manager class for wrapping template code'''
-        X = self
-        class _template:
+        def __enter__(self):
+            pass 
 
-            def __enter__(self):
-                pass #self
+        def __exit__(self, _type, value, _traceback):
+            stack = traceback.extract_stack() 
+            f, last_line = self._get_origin_info(stack)
 
-            def __exit__(self, _type, value, _traceback):
-                stack = traceback.extract_stack() 
-                f, last_line = self._get_origin_info(stack)
+            # read lines from file
+            with open(f,"r") as fin:
+                lines = list(fin)
 
-                with open(f) as fin:
-                    lines = list(fin)
-
-                i = 1
-                line = lines[last_line+i]
+            # fetches scope of CM by looping over all lines starting from the __enter__ call 
+            # until indentation is reduced
+            store, offset, first_indent = [], 0, None
+            while last_line + offset < len(lines):
+                line = lines[last_line + offset]
                 indent = len(line) - len(line.lstrip())
-                first_indent = indent
-                store = []
-                while indent>=first_indent:
-                    store.append(line[first_indent:])
-                    i+=1
-                    if last_line+i>len(lines): break
-                    line = lines[last_line+i]
-                    indent = len(line) - len(line.lstrip())
-                X._template_list.append("\n".join(store))
+                if not first_indent: first_indent = indent
+                if indent<first_indent: break
+                store.append(line[first_indent:])
+                offset+=1
+            
+            # append lines to parent storage
+            try:
+                getattr(self.parent,self.store_to).append("".join(store))
+            except:
+                raise KeyError(f"{self.parent.__class__.__name__} does not have attribute '{self.store_to}'")
 
 
-            def _get_origin_info(self, stack):
-                origin = None
-                for i, x in enumerate(stack[::-1]):
-                    if x[2] == '__exit__':
-                        origin = stack[::-1][i + 1]
-                        break
-                return origin[0], origin[1] - 1
+        def _get_origin_info(self, stack):
+            '''Fetches the filename and linenumber of the last __exit__ call'''
+            origin = None
+            for i, x in enumerate(stack[::-1]):
+                if x[2] == '__exit__':
+                    origin = stack[::-1][i + 1]
+                    return origin[0], origin[1]
+            raise Exception("Context Manager failed to exit successfully.")
 
-        return _template
+    def template_block(self):
+        '''Returns a context manager class for wrapping template code'''
+        return self.__ContextManagerStore(self,"_template_list")
+
+    def answer_block(self):
+        '''Returns a context manager class for wrapping answer code'''
+        return self.__ContextManagerStore(self,"_answer_list")
+
+    def answerpreload_block(self):
+        '''Returns a context manager class for wrapping answerpreload code'''
+        return self.__ContextManagerStore(self,"_answerpreload_list")
 
 
             
