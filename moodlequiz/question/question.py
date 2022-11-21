@@ -20,27 +20,34 @@ class Question:
         '''Returns a dictionary containing all the question details'''
         info = {'@type': self._type}
         for key in self.fields:
-            ## get attribute value and metadata
+            # get attribute value and metadata
             val = getattr(self,str(key.name))
             metadata = key.metadata
 
-            ## skip internal fields
+            # skip internal fields
             if key.name.startswith("_"): 
                 continue
 
-            
+            # no special formatting if flat
+            if not metadata.get("flat") and val:
+                info[key.name] = {'text':val}
 
-            ## format html objects as CDATA tag    
-            elif metadata.get('@format')=="html":
-                val = CDATA(val)
-
-            ## no special formatting
-            if metadata.get("flat"):
+            # no special formatting if empty string
+            elif isinstance(val,str) and len(val)<1:
                 info[key.name] = val
-            elif key.type == str:
+
+            # add as CDATA-tagged element of <text>
+            elif isinstance(val,CDATA):
+                base = dict(key.metadata)
+                base['text'] = val.tagged()
+                info[key.name] = base
+
+            # add as element of <text>
+            elif isinstance(val,str):
                 base = dict(key.metadata)
                 base['text'] = val
                 info[key.name] = base
+
             else:
                 info[key.name] = val
         return info

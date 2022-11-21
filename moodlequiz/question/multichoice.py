@@ -6,16 +6,21 @@ from ..utils import CDATA
 @dataclass
 class Option:
     fraction 	: float = field(default=0)
-    text		: str = field(default="")
-    feedback	: str = field(default="")
+    text		: CDATA = field(default="")
+    feedback	: CDATA = field(default="")
     format		: str = field(default="html",repr=False)
     feedback_format		: str = field(default="html",repr=False)
 
+    def __post_init__(self):
+        self.text = CDATA(self.text)
+        self.feedback = CDATA(self.feedback)
+        self.fraction = float(self.fraction)
+
     def to_dict(self):
-        info = {'@fraction': self.fraction,
+        info = {'@fraction': f"{self.fraction:.7f}",
             '@format' : self.format,
-            'text' : self.text,
-            'feedback': {'@format': self.feedback_format, 'text': self.feedback}}
+            'text' : CDATA(self.text),
+            'feedback': {'@format': self.feedback_format, 'text': CDATA(self.feedback)}}
         return info
 
 	
@@ -27,9 +32,9 @@ class MultiChoice(GradedQuestion):
     shuffleanswers			: bool = field(default=True)
     showstandardinstruction	: int = field(default=1) 	# displays whether to select one or multiple options
     answernumbering			: str = field(default="none",metadata={'flat':True})
-    correctfeedback			: str = field(default="",metadata={'@format':'html'})
-    partiallycorrectfeedback: str = field(default="",metadata={'@format':'html'})
-    incorrectfeedback		: str = field(default="",metadata={'@format':'html'})
+    correctfeedback			: CDATA = field(default="",metadata={'@format':'html'})
+    partiallycorrectfeedback: CDATA = field(default="",metadata={'@format':'html'})
+    incorrectfeedback		: CDATA = field(default="",metadata={'@format':'html'})
 
 
     def add_option(self,fraction,text:str,feedback:str="") -> None:
@@ -49,3 +54,6 @@ class MultiChoice(GradedQuestion):
 
     def sum_options(self) -> float:
         return sum([float(opt.fraction) for opt in self._answer])
+
+    def _check(self) -> bool:
+        return self.sum_options==100
