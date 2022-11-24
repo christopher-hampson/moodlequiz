@@ -198,6 +198,15 @@ class CodeRunner(GradedQuestion):
         if raw:
             self._template_list.append(f"{var_name} = \"\"\"{{ STUDENT_ANSWER | e('py') }}\"\"\"")
 
+    def load(self,cls,target="_template_list"):
+        '''Load external class object into the target list'''
+        source = inspect.getsource(cls.__class__)
+
+        content = getattr(self,target)
+        setattr(self,target,[source]+content)
+		
+
+
 
         
 
